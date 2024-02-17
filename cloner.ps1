@@ -1,24 +1,27 @@
+# Max Gallagher Cloner Script                                                                               ./copier.ps1                                                                                                 
 # Prompt user to input VM name
+Write-Host "Available VMs: "
+Get-VM | Select-Object -ExpandProperty Name
 $VMName = Read-Host "Enter the name of the VM:"
 $vm = Get-VM -Name $VMName
 
 # Prompt user to select a snapshot
-Write-Host "Available snapshots for VM $VMName:"
+Write-Host "Available snapshots for VM $VMName :"
 Get-Snapshot -VM $VMName | Select-Object -ExpandProperty Name
-$SnapshotName = Read-Host "Enter the name of the snapshot:"
+$SnapshotName = Read-Host "Enter the name of the snapshot"
 
 # Prompt user to select a VMHost
 Write-Host "Available VMHosts:"
 Get-VMHost | Select-Object -ExpandProperty Name
-$VMHost = Read-Host "Enter the name of the VMHost:"
+$VMHost = Read-Host "Enter the name of the VMHost"
 
 # Prompt user to select a Datastore
 Write-Host "Available Datastores:"
 Get-Datastore | Select-Object -ExpandProperty Name
-$Datastore = Read-Host "Enter the name of the Datastore:"
+$Datastore = Read-Host "Enter the name of the Datastore"
 
 # Prompt user to input new VM name
-$NewVMName = Read-Host "Enter the name of the new VM:"
+$NewVMName = Read-Host "Enter the name of the new VM"
 
 # Define linked clone name
 $linkedClone = "{0}.linked" -f $VMName
@@ -40,4 +43,7 @@ $newVM = New-VM -Name $NewVMName -VM $linkedVM -VMHost $vmhost -Datastore $ds
 
 # Remove the linked clone
 $linkedVM | Remove-VM
+
+
+
 
