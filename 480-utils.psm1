@@ -141,15 +141,30 @@ function select_host ()
         catch {
             Write-Host "Invalid host $vmhost" -ForegroundColor "Red"
         }    
+}
 
+function New-LinkedClone {param([string] $VMName,[string] $SnapshotName,[string] $Datastore,[string] $VMHost)
+    
+    Write-Host "VMName: $VMName"
+    Write-Host "SnapshotName: $SnapshotName"
+    Write-Host "Datastore: $Datastore"
+    Write-Host "VMHost: $VMHost"
 
-
+    $NewVMName = Read-Host "What would you like to name the VM: "
+    $linkedClone = "{0}.linked" -f $VMName
+    try {
+        $linkedVM = New-VM -LinkedClone -Name $linkedClone -VM $VMName -ReferenceSnapshot $SnapshotName -VMHost $VMHost -Datastore $Datastore
+        $newVM = New-VM -Name $NewVMName -VM $linkedVM -VMHost $VMHost -Datastore $Datastore
+        Write-Host "Linked clone and new VM created successfully." -ForegroundColor Green
+        }
+        catch {
+            Write-Host "Error: $_" -ForegroundColor Red
+        }
+        if ($linkedVM) {
+            $linkedVM | Remove-VM -Confirm:$false
+            Write-Host "Linked clone removed." -ForegroundColor Green
+        }
 }
 
 
-function clone()
-{
-
-
-}
 
