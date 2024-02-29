@@ -48,6 +48,7 @@ function Select-VM([string] $folder)
     try {
         $vms = Get-VM -Location $folder
         $index = 1
+        Write-Host "Here are the vms in $folder :" -ForegroundColor Cyan
         foreach($vm in $vms)
         {
             Write-Host [$index] $vm.name
@@ -63,10 +64,92 @@ function Select-VM([string] $folder)
     }    
 }
 
-#function Select-SS
 
-#function Select-Host
+function 480Disconnect {
+    $conn = $global:DefaultVIServer
+    if ($conn) {
+        Disconnect-VIServer -Server $conn -Confirm:$false
+        Write-Host "Disconnected from $($conn.Name)" -ForegroundColor Green
+} else {
+    Write-Host "You are currently not connected to any servers." -ForegroundColor "Yellow"
+}
+}
 
-#function Select-DS
 
-#function 480Disconnect
+function select_snapshot([string] $vm)
+{  
+    $selected_ss=$null
+    try {
+        $snapshots = Get-Snapshot -vm $vm
+        $index = 1
+        Write-Host "Here are the snapshots for $vm :" -ForegroundColor Cyan
+        foreach($snapshot in $snapshots)
+        {
+            Write-Host [$index] $snapshot.name
+            $index+=1
+        }
+        $pick_index = Read-Host "Which index number [x] do you wish to pick?"
+        $selected_ss = $snapshots[$pick_index -1]
+        Write-Host "You picked" $selected_ss.name
+        return $selected_ss
+    }
+    catch {
+        Write-Host "Invalid snapshot" -ForegroundColor "Red"
+    }    
+}
+
+function select_datastore()
+{
+
+    $selected_ds=$null
+    try {
+        $datastores = Get-Datastore 
+        $index = 1
+        Write-Host "Here are your available datastores:" -ForegroundColor Cyan
+        foreach($datastore in $datastores)
+        {
+            Write-Host [$index] $datastore.name
+            $index+=1
+        }
+        $pick_index = Read-Host "Which index number [x] do you wish to pick?"
+        $selected_ds = $datastores[$pick_index -1]
+        Write-Host "You picked" $selected_ds.name
+        return $selected_ds
+        }
+        catch {
+            Write-Host "Invalid datastore $ds" -ForegroundColor "Red"
+        }    
+}
+
+function select_host ()
+{
+    $selected_host=$null
+    try {
+        $hosts = Get-VMHost
+        $index = 1
+        Write-Host "Here are your available hosts:" -ForegroundColor Cyan
+        foreach($vmhost in $hosts)
+        {
+            Write-Host [$index] $vmhost.name
+            $index+=1
+        }
+        $pick_index = Read-Host "Which index number [x] do you wish to pick?"
+        $selected_host = $hosts[$pick_index -1]
+        Write-Host "You picked" $selected_host.name
+        return $selected_host
+        }
+        catch {
+            Write-Host "Invalid host $vmhost" -ForegroundColor "Red"
+        }    
+
+
+
+}
+
+
+function clone()
+{
+
+
+}
+
