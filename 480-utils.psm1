@@ -41,7 +41,7 @@ function Get-480Config ([string] $config_path)
     }
     return $conf
 }    
-
+#Lists all vms in the selected folder and allows you to pick which one you want to work with
 function Select-VM([string] $folder)
 {
     $selected_vm=$null
@@ -64,7 +64,7 @@ function Select-VM([string] $folder)
     }    
 }
 
-
+# Disconnects you from your vsphere server once the script is done running
 function 480Disconnect {
     $conn = $global:DefaultVIServer
     if ($conn) {
@@ -75,7 +75,7 @@ function 480Disconnect {
 }
 }
 
-
+# Lists all snapshots for your selected VM and allows you to chose one to use as a base snapshot for the cloning process
 function select_snapshot([string] $vm)
 {  
     $selected_ss=$null
@@ -97,7 +97,7 @@ function select_snapshot([string] $vm)
         Write-Host "Invalid snapshot" -ForegroundColor "Red"
     }    
 }
-
+#Lists your available datastores and allows you to select one
 function select_datastore()
 {
 
@@ -120,7 +120,7 @@ function select_datastore()
             Write-Host "Invalid datastore $ds" -ForegroundColor "Red"
         }    
 }
-
+#Function used to list all of the hosts for your vsphere network and allow you to switch which one you want to use
 function select_host ()
 {
     $selected_host=$null
@@ -142,29 +142,171 @@ function select_host ()
             Write-Host "Invalid host $vmhost" -ForegroundColor "Red"
         }    
 }
-
+#Function used to create a new linked clone
 function New-LinkedClone {param([string] $VMName,[string] $SnapshotName,[string] $Datastore,[string] $VMHost)
-    
+
+    Write-Host "Your selected configurations are:" -ForegroundColor Cyan 
     Write-Host "VMName: $VMName"
     Write-Host "SnapshotName: $SnapshotName"
     Write-Host "Datastore: $Datastore"
     Write-Host "VMHost: $VMHost"
 
-    $NewVMName = Read-Host "What would you like to name the VM: "
-    $linkedClone = "{0}.linked" -f $VMName
-    try {
-        $linkedVM = New-VM -LinkedClone -Name $linkedClone -VM $VMName -ReferenceSnapshot $SnapshotName -VMHost $VMHost -Datastore $Datastore
-        $newVM = New-VM -Name $NewVMName -VM $linkedVM -VMHost $VMHost -Datastore $Datastore
-        Write-Host "Linked clone and new VM created successfully." -ForegroundColor Green
+    $Skip = Read-Host "Do you want to create a linked clone? (Y/N)"
+    if ($Skip -eq "Y") 
+    {
+        $NewVMName = Read-Host "What would you like to name the VM: "
+        $linkedClone = "{0}.linked" -f $VMName
+        try {
+            $linkedVM = New-VM -LinkedClone -Name $linkedClone -VM $VMName -ReferenceSnapshot $SnapshotName -VMHost $VMHost -Datastore $Datastore
+            $newVM = New-VM -Name $NewVMName -VM $linkedVM -VMHost $VMHost -Datastore $Datastore
+            Write-Host "Linked clone and new VM created successfully." -ForegroundColor Green
+            }
+            catch {
+                Write-Host "Error: $_" -ForegroundColor Red
+            }
+            if ($linkedVM) {
+                $linkedVM | Remove-VM -Confirm:$false
+                Write-Host "Linked clone removed." -ForegroundColor Green
+            }
         }
-        catch {
-            Write-Host "Error: $_" -ForegroundColor Red
-        }
-        if ($linkedVM) {
-            $linkedVM | Remove-VM -Confirm:$false
-            Write-Host "Linked clone removed." -ForegroundColor Green
+    else {
+        Write-Host ("Skipping Linked Clone Creation") -ForegroundColor Cyan
         }
 }
 
 
+# Function to create a Virtual Switch and Portgroup
+function New-Network { param([string] $VMHost)
+    try {
+    Write-Host "VMHost: $VMHost"
+    Write-Host("Starting to create a New Network")
+    $switchName = Read-Host("What would you like to name the new switch?") 
+    $newSwitch = New-VirtualSwitch -VMHost $VMHost -Name $switchName 
+    $pgName = Read-Host("What would you like to name your new portgroup?") 
+    New-VirtualPortGroup -VirtualSwitch $newSwitch -Name $pgName 
+    Write-Host("Switch Created") -ForegroundColor Green
+    Get-VirtualSwitch
+    }
+    catch {
+        Write-Host "Error: $_" -ForegroundColor Red
+    }
+        
+}
+#Function to get VMs Name, Ip Address, and Mac Address
+function Get-IP { param([string] $VMName)
+    Write-Host("Here are is your information for that VM") -ForegroundColor Cyan
+    $VM = Get-VM -Name $VMName
+    $IPAddress = ($VM.Guest.IPAddress | Where-Object { $_ -match '\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}' })
+    $NetAdapter = Get-NetworkAdapter -VM $VM
+    $MACAddress = $NetAdapter.MacAddress
+   
+    Write-Host "VM Name: $VMName" -ForegroundColor Yellow
+    Write-Host "MAC Address: $MACAddress" -ForegroundColor Yellow
+    Write-Host "IP Address: $IPAddress" -ForegroundColor Yellow
+   }
 
+#Start and Stop
+
+function PowerVM { param ([string] $VMNAME)
+   $skipPower = Read-Host "Would you like to power on/off a VM? [y or n]"
+   if ($skipPower -eq "Y" -or $skipPower -eq "y") 
+   {
+    $powerOpt = Read-Host "Would you like to turn the VM on or off?"
+    if ($powerOpt -eq "on")
+    {
+        Start-VM $VMName
+        Write-Host "$VMName has been started" -ForegroundColor Green
+    }
+    elseif ($powerOpt -eq "off") {
+        Stop-VM $VMName
+        Write-Host "$VMName has been stopped" -ForegroundColor Green
+    }
+    else {
+        Write-Host ("invalid response, skipping power settings")
+    } 
+ }
+    else {
+        Write-Host ("Skipping VM Power Settings")
+    }
+
+ }
+
+function Set-Network { param ([string] $VMName)
+Get-NetworkAdapter $VMName
+    $selectedAdapter=$null
+        try {
+            $adapters = Get-NetworkAdapter $VMName
+            $index = 1
+            Write-Host "Here are your available network adapters:" -ForegroundColor Cyan
+            foreach($adapter in $adapters)
+                {
+                    Write-Host "[$index] $($adapter.Name)"
+                    $index+=1
+                }
+                $pick_index = Read-Host "Which index number do you wish to pick?"
+                $selectedAdapter = $adapters[$pick_index -1]
+                Write-Host "You picked $($selectedAdapter.Name)"
+                }
+            catch {
+                Write-Host "Invalid Adapter" -ForegroundColor "Red"
+            }     
+    $selectedVNetwork = $null
+            try {
+                $vNetworks = Get-VirtualNetwork
+                $index = 1
+                Write-Host "Here are your available virtual networks"
+                foreach($vNetwork in $vNetworks)
+                    {
+                        Write-Host "[$index] $($vNetwork.Name)"
+                        $index+=1
+                    }
+                    $pick_index = Read-Host "Which index number do you wish to pick?"
+                    $selectedVNetwork = $vNetworks[$pick_index -1]
+                    Write-Host "You picked $($selectedVNetwork.Name)"
+                    Set-NetworkAdapter -NetworkAdapter $selectedAdapter -NetworkName $selectedVNetwork
+                }
+            catch {
+                Write-Host "Invalid virtual network" -ForegroundColor "Red"
+            }
+            
+    $changeAnother = Read-Host "Do you want to change another network adapter? (Y/N)"
+        while ($changeAnother -eq 'Y') {
+            try {
+                $adapters = Get-NetworkAdapter $VMName
+                $index = 1
+                Write-Host "Here are your available network adapters:" -ForegroundColor Cyan
+                foreach($adapter in $adapters)
+                    {
+                        Write-Host "[$index] $($adapter.Name)"
+                        $index+=1
+                    }
+                    $pick_index = Read-Host "Which index number do you wish to pick?"
+                    $selectedAdapter = $adapters[$pick_index -1]
+                    Write-Host "You picked $($selectedAdapter.Name)"
+                }
+            catch {
+                    Write-Host "Invalid Adapter" -ForegroundColor "Red"
+                }    
+            try {
+                    $vNetworks = Get-VirtualNetwork
+                    $index = 1
+                    Write-Host "Here are your available virtual networks"
+                    foreach($vNetwork in $vNetworks)
+                    {
+                        Write-Host "[$index] $($vNetwork.Name)"
+                        $index+=1
+                    }
+                    $pick_index = Read-Host "Which index number do you wish to pick?"
+                    $selectedVNetwork = $vNetworks[$pick_index -1]
+                    Write-Host "You picked $($selectedVNetwork.Name)"
+                    Set-NetworkAdapter -NetworkAdapter $selectedAdapter -NetworkName $selectedVNetwork
+                }
+            catch {
+                    Write-Host "Invalid virtual network" -ForegroundColor "Red"
+                }        
+                $changeAnother = Read-Host "Do you want to change another network adapter? (Y/N)"
+                }
+            }
+
+
+ 
